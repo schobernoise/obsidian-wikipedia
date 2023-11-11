@@ -1,7 +1,7 @@
 {
-  "name": "obsidian-wikipedia",
-  "version": "1.0.3",
-  "description": "Grabs information from Wikipedia for a topic and brings it into Obsidian notes",
+  "name": "obsidian-wikipedia-extended",
+  "version": "0.0.1",
+  "description": "Forked from obsidian-wikipedia by Jonathan Miller. Extened information gathering.",
   "main": "main.js",
   "scripts": {
     "dev": "rollup --config rollup.config.js -w",
@@ -10,7 +10,7 @@
   "keywords": [
     "obsidian-plugin"
   ],
-  "author": "Jonathan Miller",
+  "author": "Fabian Schober",
   "license": "MIT",
   "devDependencies": {
     "@rollup/plugin-commonjs": "^18.0.0",

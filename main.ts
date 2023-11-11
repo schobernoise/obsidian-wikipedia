@@ -11,31 +11,9 @@ import {
   RequestParam,
   request,
 } from "obsidian";
-
-interface WikipediaExtract {
-  title: string;
-  text: string;
-  url: string;
-}
-
-interface WikipediaPluginSettings {
-  template: string;
-  shouldUseParagraphTemplate: boolean;
-  shouldBoldSearchTerm: boolean;
-  paragraphTemplate: string;
-  language: string;
-}
-
-const DEFAULT_SETTINGS: WikipediaPluginSettings = {
-  template: `{{text}}\n> [Wikipedia]({{url}})`,
-  shouldUseParagraphTemplate: true,
-  shouldBoldSearchTerm: true,
-  paragraphTemplate: `> {{paragraphText}}\n>\n`,
-  language: "en",
-};
-
-const extractApiUrl =
-  "wikipedia.org/w/api.php?format=json&action=query&prop=extracts&explaintext=1&redirects&origin=*&titles=";
+import { WikipediaExtract, WikipediaPluginSettings } from "./interfaces";
+import { DEFAULT_SETTINGS, extractApiUrl } from "./config";
+import { formatWikiToMarkdown } from "utils";
 
 const disambiguationIdentifier = "may refer to:";
 export default class WikipediaPlugin extends Plugin {
@@ -79,6 +57,21 @@ export default class WikipediaPlugin extends Plugin {
     return formattedText;
   }
 
+  formatExtractWholeArticle(
+    extract: WikipediaExtract,
+    searchTerm: string
+  ): string {
+    const text = extract.text;
+    let formattedText: string = formatWikiToMarkdown(text);
+
+    if (this.settings.shouldBoldSearchTerm) {
+      const pattern = new RegExp(searchTerm, "i");
+      formattedText = formattedText.replace(pattern, `**${searchTerm}**`);
+    }
+
+    return formattedText;
+  }
+
   handleNotFound(searchTerm: string) {
     new Notice(`${searchTerm} not found on Wikipedia.`);
   }
@@ -114,12 +107,23 @@ export default class WikipediaPlugin extends Plugin {
 
   formatExtractInsert(extract: WikipediaExtract, searchTerm: string): string {
     const formattedText = this.formatExtractText(extract, searchTerm);
+
     const template = this.settings.template;
     const formattedTemplate = template
       .replace("{{text}}", formattedText)
       .replace("{{searchTerm}}", searchTerm)
       .replace("{{url}}", extract.url);
     return formattedTemplate;
+  }
+
+  formatWholeArticleInsert(
+    extract: WikipediaExtract,
+    searchTerm: string
+  ): string {
+    return `${extract.url}\n\n${this.formatExtractWholeArticle(
+      extract,
+      searchTerm
+    )}`;
   }
 
   async getWikipediaText(title: string): Promise<WikipediaExtract | undefined> {
@@ -139,8 +143,15 @@ export default class WikipediaPlugin extends Plugin {
     return extract;
   }
 
-  async pasteIntoEditor(editor: Editor, searchTerm: string) {
+  async pasteIntoEditor(
+    editor: Editor,
+    searchTerm: string,
+    wholeArticle: boolean = false
+  ) {
     let extract: WikipediaExtract = await this.getWikipediaText(searchTerm);
+    // console.log("EXTRACT", extract.text);
+    // console.log("EXTRACT", wholeArticle);
+
     if (!extract) {
       this.handleNotFound(searchTerm);
       return;
@@ -156,14 +167,22 @@ export default class WikipediaPlugin extends Plugin {
         .split("==")
         .pop()
         .trim();
+
       extract = await this.getWikipediaText(newSearchTerm);
       if (!extract) {
         this.handleCouldntResolveDisambiguation();
         return;
       }
     }
-    editor.replaceSelection(this.formatExtractInsert(extract, searchTerm));
+    // console.log(extract);
+    editor.replaceSelection(
+      wholeArticle
+        ? this.formatWholeArticleInsert(extract, searchTerm)
+        : this.formatExtractInsert(extract, searchTerm)
+    );
   }
+
+  // * COMMANDS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   async getWikipediaTextForActiveFile(editor: Editor) {
     const activeFile = await this.app.workspace.getActiveFile();
@@ -178,6 +197,18 @@ export default class WikipediaPlugin extends Plugin {
   async getWikipediaTextForSearchTerm(editor: Editor) {
     new WikipediaSearchModal(this.app, this, editor).open();
   }
+
+  async getWholeArticleForActiveFile(editor: Editor) {
+    const activeFile = await this.app.workspace.getActiveFile();
+    if (activeFile) {
+      const searchTerm = activeFile.basename;
+      if (searchTerm) {
+        await this.pasteIntoEditor(editor, searchTerm, true);
+      }
+    }
+  }
+
+  // * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   async onload() {
     await this.loadSettings();
@@ -194,6 +225,13 @@ export default class WikipediaPlugin extends Plugin {
       name: "Get Wikipedia for Search Term",
       editorCallback: (editor: Editor) =>
         this.getWikipediaTextForSearchTerm(editor),
+    });
+
+    this.addCommand({
+      id: "wikipedia-get-active-note-whole-article",
+      name: "Get whole Wikipedia Article for Active Note",
+      editorCallback: (editor: Editor) =>
+        this.getWholeArticleForActiveFile(editor),
     });
 
     this.addSettingTab(new WikipediaSettingTab(this.app, this));
@@ -271,11 +309,13 @@ class WikipediaSettingTab extends PluginSettingTab {
 
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Obsidian Wikipedia" });
+    containerEl.createEl("h2", { text: "Obsidian Wikipedia Extended" });
 
     new Setting(containerEl)
       .setName("Wikipedia Language Prefix")
-      .setDesc(`Choose Wikipedia language prefix to use (ex. en for English)`)
+      .setDesc(
+        `Choose Wikipedia language default prefix to use (ex. en for English)`
+      )
       .addText((textField) => {
         textField
           .setValue(this.plugin.settings.language)

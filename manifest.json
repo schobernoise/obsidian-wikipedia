@@ -1,10 +1,10 @@
 {
-  "id": "obsidian-wikipedia",
-  "name": "Wikipedia",
-  "version": "1.0.3",
+  "id": "obsidian-wikipedia-extended",
+  "name": "Wikipedia Extended",
+  "version": "0.0.1",
   "minAppVersion": "0.9.12",
-  "description": "Grabs information from Wikipedia for a topic and brings it into Obsidian notes",
-  "author": "Jonathan Miller",
-  "authorUrl": "https://jmill.dev",
+  "description": "Forked from obsidian-wikipedia by Jonathan Miller. Extened information gathering.",
+  "author": "Fabian Schober",
+  "authorUrl": "https://fabianschober.com",
   "isDesktopOnly": false
 }
